@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: "1024M"
+        reservations:
+          cpus: "0.3"
+          memory: "512M"
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+      - API_TOKEN=${API_TOKEN}
+      - WEBHOOK_TOKEN=${WEBHOOK_TOKEN}
+      - BROWSER_POOL_MIN=2
+      - BROWSER_POOL_MAX=5
+      - BROWSER_MAX_USES=50
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.pdf.rule=PathPrefix(`/`)"
+      - "traefik.http.services.pdf.loadbalancer.server.port=3000"
+    depends_on:
+      - redis
+    networks:
+      - pdf-network
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    deploy:
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: "512M"
+    networks:
+      - pdf-network
+
+  traefik:
+    image: traefik:v2.11
+    ports:
+      - "9090:80"      # Aplicação (inclui Swagger em /docs)
+      - "3001:3001"    # Bull Board
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.bullboard.address=:3001"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    networks:
+      - pdf-network
+
+networks:
+  pdf-network:
+    driver: bridge
