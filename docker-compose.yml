@@ -20,6 +20,7 @@ services:
       - BROWSER_POOL_MIN=2
       - BROWSER_POOL_MAX=5
       - BROWSER_MAX_USES=50
+      - SYNC_PDF_MAX_HTML_SIZE=${SYNC_PDF_MAX_HTML_SIZE:-51200}
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.pdf.rule=PathPrefix(`/`)"

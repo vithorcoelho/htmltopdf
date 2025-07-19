@@ -17,6 +17,7 @@ services:
       - JOB_TIMEOUT=30000
       - PDF_STORAGE_DIR=./pdfs
       - PDF_EXPIRATION_SECONDS=86400
+      - SYNC_PDF_MAX_HTML_SIZE=${SYNC_PDF_MAX_HTML_SIZE:-51200}
     depends_on:
       - redis
     volumes:

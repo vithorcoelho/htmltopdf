@@ -18,7 +18,11 @@ app.use(cors({
   optionsSuccessStatus: 200
 }));
 
-app.use(express.json());
+// Configurar limite de payload para o endpoint síncrono
+const maxSyncPayload = parseInt(process.env.SYNC_PDF_MAX_HTML_SIZE) || 51200;
+app.use(express.json({ 
+  limit: Math.max(maxSyncPayload * 2, 1024 * 1024) // Pelo menos 1MB ou 2x o limite do sync
+}));
 
 // Rotas
 app.use('/api', pdfRoutes);

@@ -84,7 +84,7 @@ htmltopdf/
 
 ### POST /generate
 
-Endpoint para solicitar geração de PDF.
+Endpoint para solicitar geração de PDF (assíncrono com filas).
 
 **Request:**
 ```json
@@ -107,6 +107,54 @@ Content-Type: application/json
 {
   "jobId": "550e8400-e29b-41d4-a716-446655440000",
   "status": "queued"
+}
+```
+
+### POST /generate-sync
+
+Endpoint para geração síncrona de PDF (para HTMLs pequenos).
+
+**Características:**
+- Processamento síncrono (resposta imediata)
+- Limite de tamanho configurável (padrão: 50KB de HTML)
+- Não utiliza sistema de filas
+- Adequado para HTMLs pequenos e simples
+
+**Request:**
+```json
+{
+  "html": "<html><body><h1>PDF Simples</h1></body></html>",
+  "pageSize": "A4",            // opções: A4 (default), A3, Letter e Square
+  "orientation": "portrait"     // opcional: portrait ou landscape
+}
+```
+
+**Headers obrigatórios:**
+```
+Authorization: Bearer <API_TOKEN>
+Content-Type: application/json
+```
+
+**Response de Sucesso:**
+```json
+{
+  "success": true,
+  "fileId": "a3fafc13-e776-4fcb-a100-c474ea6422a4",
+  "fileName": "sync_a3fafc13-e776-4fcb-a100-c474ea6422a4.pdf",
+  "downloadUrl": "/api/jobs/a3fafc13-e776-4fcb-a100-c474ea6422a4/download",
+  "size": 15360,
+  "htmlSize": 1024,
+  "message": "PDF gerado com sucesso"
+}
+```
+
+**Response de Erro (HTML muito grande):**
+```json
+{
+  "error": "HTML muito grande. Tamanho máximo permitido: 50KB. Tamanho atual: 75KB",
+  "maxSize": 51200,
+  "currentSize": 76800,
+  "suggestion": "Use o endpoint /api/generate para conteúdo maior"
 }
 ```
 
@@ -148,6 +196,9 @@ BROWSER_MAX_USES=50
 # Timeouts
 JOB_TIMEOUT=30000
 WEBHOOK_TIMEOUT=10000
+
+# Limite para endpoint síncrono (em bytes)
+SYNC_PDF_MAX_HTML_SIZE=51200  # 50KB por padrão
 ```
 
 ### 2. Package.json
