@@ -22,7 +22,7 @@ async function extractHtmlAndGeneratePdf() {
     
     page = await browser.newPage();
     
-    const url = 'https://www.band.com.br/esportes/automobilismo/formula-1/calendario';
+    const url = 'https://sandbox.vidanova.ionnutri.com.br/laudos/4/html';
     console.log(`🌐 Navegando para: ${url}`);
     
     // Tentar carregar a página com múltiplas estratégias

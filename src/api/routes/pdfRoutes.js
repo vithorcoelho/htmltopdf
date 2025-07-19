@@ -2,6 +2,7 @@ const express = require('express');
 const authenticate = require('../middlewares/auth');
 const { generatePdf } = require('../controllers/pdfController');
 const { generatePdfSync } = require('../controllers/syncPdfController');
+const { generatePdfFromUrl } = require('../controllers/urlToPdfController');
 const { 
   getJobStatus, 
   downloadPdf, 
@@ -270,6 +271,142 @@ router.post('/generate', authenticate, generatePdf);
  *                   example: 'Use o endpoint /api/generate para conteúdo maior'
  */
 router.post('/generate-sync', authenticate, generatePdfSync);
+
+/**
+ * @swagger
+ * /api/generate-url:
+ *   post:
+ *     tags:
+ *       - PDF Generation
+ *     summary: Gerar PDF a partir de URL com validação síncrona de webhook
+ *     description: |
+ *       Endpoint simplificado que gera PDF apenas a partir de URL e envia o resultado via webhook.
+ *       **Não armazena arquivos** - o PDF é enviado diretamente para o webhook.
+ *       
+ *       **Fluxo do processo**:
+ *       1. **Validação síncrona** do webhook (timeout 2s): `{"status": "Geração do PDF iniciada"}`
+ *       2. Se webhook retornar 200, aceita requisição e inicia geração
+ *       3. Se webhook falhar, retorna erro 400 imediatamente
+ *       4. PDF é gerado de forma assíncrona e enviado via webhook
+ *       
+ *       **Características**:
+ *       - **Validação síncrona** do webhook (2 segundos de timeout)
+ *       - **Falha rápida** se webhook não responder
+ *       - Processamento assíncrono após validação
+ *       - Sem armazenamento local
+ *       - Limite de 10MB para o PDF gerado
+ *       - Timeout de 60s para carregamento da página
+ *       
+ *       **Webhook deve aceitar**:
+ *       - POST com JSON para validação inicial e notificações
+ *       - POST com multipart/form-data para receber o PDF
+ *       - **Deve responder em até 2 segundos**
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               url:
+ *                 type: string
+ *                 format: uri
+ *                 description: URL da página para converter em PDF
+ *                 example: 'https://www.google.com'
+ *               webhook:
+ *                 type: string
+ *                 format: uri
+ *                 description: URL do webhook para receber notificações e o PDF
+ *                 example: 'https://meusite.com/webhook'
+ *             required:
+ *               - url
+ *               - webhook
+ *             example:
+ *               url: 'https://www.band.com.br/esportes'
+ *               webhook: 'https://meusite.com/pdf-webhook'
+ *     responses:
+ *       202:
+ *         description: Webhook validado - processamento iniciado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: 'Webhook validado - PDF será gerado'
+ *                 url:
+ *                   type: string
+ *                   example: 'https://www.google.com'
+ *                 webhook:
+ *                   type: string
+ *                   example: 'https://meusite.com/webhook'
+ *                 status:
+ *                   type: string
+ *                   example: 'Processamento iniciado'
+ *       400:
+ *         description: Dados inválidos ou webhook inválido
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: 'Timeout na validação do webhook'
+ *                 details:
+ *                   type: string
+ *                   example: 'Webhook deve responder em até 2 segundos'
+ *                 webhookUrl:
+ *                   type: string
+ *                   example: 'https://meusite.com/webhook'
+ *                 timeout:
+ *                   type: string
+ *                   example: '2 segundos'
+ *                 suggestion:
+ *                   type: string
+ *                   example: 'Verifique se o webhook está ativo e responde rapidamente'
+ *             examples:
+ *               missing_params:
+ *                 summary: Parâmetros obrigatórios ausentes
+ *                 value:
+ *                   error: 'URL e webhook são obrigatórios'
+ *                   example:
+ *                     url: 'https://example.com'
+ *                     webhook: 'https://meusite.com/webhook'
+ *               invalid_url:
+ *                 summary: URL inválida
+ *                 value:
+ *                   error: 'URL ou webhook inválido'
+ *                   details: 'Invalid URL'
+ *               webhook_timeout:
+ *                 summary: Webhook não responde em 2 segundos
+ *                 value:
+ *                   error: 'Timeout na validação do webhook'
+ *                   details: 'Webhook deve responder em até 2 segundos'
+ *                   webhookUrl: 'https://meusite.com/webhook'
+ *                   timeout: '2 segundos'
+ *                   suggestion: 'Verifique se o webhook está ativo e responde rapidamente'
+ *               webhook_error:
+ *                 summary: Webhook retorna erro
+ *                 value:
+ *                   error: 'Webhook retornou erro'
+ *                   details: 'Status 500: Internal Server Error'
+ *                   webhookUrl: 'https://meusite.com/webhook'
+ *               webhook_unreachable:
+ *                 summary: Webhook inacessível
+ *                 value:
+ *                   error: 'Webhook inacessível'
+ *                   details: 'Não foi possível conectar ao webhook'
+ *                   webhookUrl: 'https://meusite.com/webhook'
+ *       401:
+ *         description: Token não fornecido
+ *       403:
+ *         description: Token inválido
+ */
+router.post('/generate-url', authenticate, generatePdfFromUrl);
 
 /**
  * @swagger

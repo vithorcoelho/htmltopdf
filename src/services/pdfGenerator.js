@@ -18,13 +18,13 @@ async function generate({ html, url, pageSize = 'A4', orientation = 'portrait' }
     await page.setViewportSize({ width: 1920, height: 1080 });
     
     if (html) {
-      console.log(`📄 Definindo conteúdo HTML (${Math.round(html.length/1024)}KB)...`);
+      console.log(`Definindo conteúdo HTML (${Math.round(html.length/1024)}KB)...`);
       await page.setContent(html, { 
         waitUntil: 'domcontentloaded',
         timeout: 30000 
       });
     } else if (url) {
-      console.log(`🌐 Carregando: ${url}`);
+      console.log(`Carregando: ${url}`);
       try {
         await page.goto(url, { 
           waitUntil: 'networkidle', 
@@ -62,7 +62,7 @@ async function generate({ html, url, pageSize = 'A4', orientation = 'portrait' }
       await page.waitForTimeout(3000);
     }
     
-    console.log(`📄 Gerando PDF (${pageSize}, ${orientation})...`);
+    console.log(`Gerando PDF (${pageSize}, ${orientation})...`);
     const startTime = Date.now();
     
     const pdfBuffer = await page.pdf({
