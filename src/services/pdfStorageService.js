@@ -18,10 +18,10 @@ class PdfStorageService {
       // Limpar PDFs expirados na inicialização
       await this.cleanExpiredPdfs();
       
-      // Configurar limpeza automática a cada hora
+      // Configurar limpeza automática a cada 30 segundos
       setInterval(() => {
         this.cleanExpiredPdfs();
-      }, 60 * 60 * 1000); // 1 hora
+      }, 30 * 1000); // 30 segundos
     } catch (error) {
       console.error('Erro ao inicializar storage:', error);
     }
@@ -142,17 +142,24 @@ class PdfStorageService {
   }
 
   async cleanExpiredPdfs() {
-    console.log('Iniciando limpeza de PDFs expirados...');
+    const now = new Date();
+    console.log(`🧹 Verificando PDFs expirados em ${now.toLocaleTimeString()}...`);
     let cleaned = 0;
     
     for (const [jobId, job] of this.jobs.entries()) {
-      if (new Date() > job.expiresAt) {
+      const secondsAlive = Math.floor((now - job.createdAt) / 1000);
+      const isExpired = now > job.expiresAt;
+      
+      if (isExpired) {
+        console.log(`❌ PDF expirado: ${jobId} (${secondsAlive}s de vida, limite: ${this.expirationSeconds}s)`);
         await this.deletePdf(jobId);
         cleaned++;
+      } else {
+        console.log(`✅ PDF ativo: ${jobId} (${secondsAlive}s de vida, expira em ${Math.floor((job.expiresAt - now) / 1000)}s)`);
       }
     }
     
-    console.log(`Limpeza concluída: ${cleaned} PDFs removidos`);
+    console.log(`🧹 Limpeza concluída: ${cleaned} PDFs removidos, ${this.jobs.size} PDFs ativos`);
   }
 
   getStats() {
