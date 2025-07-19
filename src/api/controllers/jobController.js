@@ -149,7 +149,7 @@ async function getStorageStats(req, res) {
     const stats = pdfStorageService.getStats();
     res.json({
       ...stats,
-      expirationHours: process.env.PDF_EXPIRATION_HOURS || 24,
+      expirationSeconds: process.env.PDF_EXPIRATION_SECONDS || 86400,
       storageDir: process.env.PDF_STORAGE_DIR || './pdfs'
     });
   } catch (error) {

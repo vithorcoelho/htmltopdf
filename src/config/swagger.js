@@ -75,7 +75,7 @@ Se você não fornecer um webhookUrl, pode:
 
 ## ⏰ Expiração de PDFs
 
-- **Prazo**: PDFs expiram em 24 horas (configurável)
+- **Prazo**: PDFs expiram após tempo configurável (padrão: 86400 segundos)
 - **Limpeza automática**: Arquivos são removidos automaticamente após expiração
 - **Regeneração**: PDFs expirados podem ser regenerados com os dados originais
 

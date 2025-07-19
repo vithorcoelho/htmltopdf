@@ -16,7 +16,7 @@ services:
       - BROWSER_MAX_USES=50
       - JOB_TIMEOUT=30000
       - PDF_STORAGE_DIR=./pdfs
-      - PDF_EXPIRATION_HOURS=24
+      - PDF_EXPIRATION_SECONDS=86400
     depends_on:
       - redis
     volumes:

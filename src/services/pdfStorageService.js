@@ -4,7 +4,7 @@ const path = require('path');
 class PdfStorageService {
   constructor() {
     this.storageDir = process.env.PDF_STORAGE_DIR || './pdfs';
-    this.expirationHours = parseInt(process.env.PDF_EXPIRATION_HOURS) || 24;
+    this.expirationSeconds = parseInt(process.env.PDF_EXPIRATION_SECONDS) || 86400; // 24 horas em segundos
     this.jobs = new Map(); // In-memory job tracking
     
     this.init();
@@ -38,7 +38,7 @@ class PdfStorageService {
       this.jobs.set(jobId, {
         status: 'completed',
         createdAt: new Date(),
-        expiresAt: new Date(Date.now() + this.expirationHours * 60 * 60 * 1000),
+        expiresAt: new Date(Date.now() + this.expirationSeconds * 1000),
         filename,
         filepath,
         size: pdfBuffer.length,
@@ -115,7 +115,7 @@ class PdfStorageService {
     this.jobs.set(jobId, {
       status: 'failed',
       createdAt: new Date(),
-      expiresAt: new Date(Date.now() + this.expirationHours * 60 * 60 * 1000),
+      expiresAt: new Date(Date.now() + this.expirationSeconds * 1000),
       error: error.message || error
     });
   }
@@ -124,7 +124,7 @@ class PdfStorageService {
     this.jobs.set(jobId, {
       status: 'processing',
       createdAt: new Date(),
-      expiresAt: new Date(Date.now() + this.expirationHours * 60 * 60 * 1000)
+      expiresAt: new Date(Date.now() + this.expirationSeconds * 1000)
     });
   }
 

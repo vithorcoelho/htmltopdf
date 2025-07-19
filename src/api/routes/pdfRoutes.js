@@ -162,7 +162,7 @@ router.get('/jobs/:jobId/status', authenticate, getJobStatus);
  *     description: |
  *       Faz o download direto do arquivo PDF gerado.
  *       
- *       **Importante**: O PDF expira em 24 horas após a geração.
+ *       **Importante**: O PDF expira após o tempo configurado.
  *       Se expirado, use o endpoint de regeneração.
  *     security:
  *       - bearerAuth: []
@@ -330,10 +330,10 @@ router.post('/jobs/:jobId/regenerate', authenticate, regeneratePdf);
  *                   type: number
  *                   description: Número total de jobs rastreados
  *                   example: 7
- *                 expirationHours:
+ *                 expirationSeconds:
  *                   type: number
- *                   description: Horas até expiração dos PDFs
- *                   example: 24
+ *                   description: Segundos até expiração dos PDFs
+ *                   example: 86400
  *                 storageDir:
  *                   type: string
  *                   description: Diretório de armazenamento
