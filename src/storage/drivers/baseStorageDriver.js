@@ -99,30 +99,6 @@ class BaseStorageDriver {
   }
 
   /**
-   * Limpa PDFs expirados
-   */
-  async cleanExpiredPdfs() {
-    const now = new Date();
-    console.log(`🧹 Verificando PDFs expirados em ${now.toLocaleTimeString()}...`);
-    let cleaned = 0;
-    
-    for (const [jobId, job] of this.jobs.entries()) {
-      const secondsAlive = Math.floor((now - job.createdAt) / 1000);
-      const isExpired = now > job.expiresAt;
-      
-      if (isExpired) {
-        console.log(`❌ PDF expirado: ${jobId} (${secondsAlive}s de vida, limite: ${this.expirationSeconds}s)`);
-        await this.deletePdf(jobId);
-        cleaned++;
-      } else {
-        console.log(`✅ PDF ativo: ${jobId} (${secondsAlive}s de vida, expira em ${Math.floor((job.expiresAt - now) / 1000)}s)`);
-      }
-    }
-    
-    console.log(`🧹 Limpeza concluída: ${cleaned} PDFs removidos, ${this.jobs.size} PDFs ativos`);
-  }
-
-  /**
    * Obtém estatísticas do storage
    * @returns {object} - Estatísticas
    */

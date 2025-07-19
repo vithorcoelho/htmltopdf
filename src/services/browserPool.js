@@ -5,11 +5,14 @@ const factory = {
   create: async () => {
     try {
       const browser = await chromium.launch({
-        headless: true,
+        headless: false, // Modo visual para debug
         args: [
           '--no-sandbox', 
           '--disable-setuid-sandbox',
           '--disable-web-security',
+          '--disable-features=VizDisplayCompositor',
+          '--start-maximized', // Iniciar maximizado para melhor visualização
+          '--disable-web-security', // Permitir acesso a recursos externos
           '--disable-features=VizDisplayCompositor'
         ]
       });

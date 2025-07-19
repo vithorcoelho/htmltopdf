@@ -15,14 +15,6 @@ class LocalStorageDriver extends BaseStorageDriver {
     try {
       await fs.mkdir(this.storageDir, { recursive: true });
       console.log(`📁 Diretório de PDFs criado: ${this.storageDir}`);
-      
-      // Limpar PDFs expirados na inicialização
-      await this.cleanExpiredPdfs();
-      
-      // Configurar limpeza automática a cada 30 segundos
-      setInterval(() => {
-        this.cleanExpiredPdfs();
-      }, 30 * 1000);
     } catch (error) {
       console.error('❌ Erro ao inicializar storage local:', error);
       throw error;
@@ -48,7 +40,7 @@ class LocalStorageDriver extends BaseStorageDriver {
         ...jobData
       });
 
-      console.log(`💾 PDF salvo localmente: ${filename} (${pdfBuffer.length} bytes)`);
+      console.log(`💾 PDF salvo: ${filename}`);
       return { filename, filepath, size: pdfBuffer.length, driver: 'local' };
     } catch (error) {
       console.error('❌ Erro ao salvar PDF localmente:', error);
@@ -97,7 +89,7 @@ class LocalStorageDriver extends BaseStorageDriver {
     if (job && job.filepath) {
       try {
         await fs.unlink(job.filepath);
-        console.log(`🗑️ PDF local removido: ${job.filename}`);
+        console.log(`🗑️ PDF removido: ${job.filename}`);
       } catch (error) {
         console.error(`❌ Erro ao remover PDF local ${jobId}:`, error);
       }

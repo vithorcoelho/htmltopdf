@@ -30,8 +30,6 @@ async function generatePdfSync(req, res) {
     }
 
     // Gerar PDF diretamente (síncrono)
-    console.log(`Gerando PDF síncrono - Tamanho do HTML: ${Math.round(htmlSize / 1024)}KB`);
-    
     const pdfBuffer = await pdfGenerator.generate({
       html,
       pageSize,

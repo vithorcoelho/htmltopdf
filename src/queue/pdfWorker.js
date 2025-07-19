@@ -53,7 +53,6 @@ try {
       });
       
       // Salvar PDF no storage
-      console.log(`💾 Salvando PDF para job ${job.id}...`);
       await pdfStorageService.savePdf(job.id, pdfBuffer, {
         pageSize,
         orientation,
@@ -66,17 +65,15 @@ try {
       // Enviar webhook apenas se fornecido
       if (webhookUrl) {
         try {
-          console.log(`🔔 Enviando webhook para job ${job.id}...`);
           await webhookService.send({
             webhookUrl,
             jobId: job.id,
             status: 'completed',
             pdfBuffer
           });
-          console.log(`✅ Webhook enviado com sucesso para job ${job.id}`);
+          console.log(`✅ Webhook enviado para job ${job.id}`);
         } catch (webhookError) {
           console.error(`❌ Erro ao enviar webhook para job ${job.id}:`, webhookError.message);
-          console.error('Stack trace:', webhookError.stack);
           // Não falhar o job por erro de webhook
         }
       } else {
@@ -113,7 +110,25 @@ try {
     }
   }, {
     connection: connectionConfig,
-    concurrency: 5
+    concurrency: 5,
+    settings: {
+      retryProcessDelay: 5000,
+      maxStalledCount: 1,
+      stalledInterval: 30000
+    },
+    removeOnComplete: parseInt(process.env.QUEUE_REMOVE_ON_COMPLETE) || 50,
+    removeOnFail: parseInt(process.env.QUEUE_REMOVE_ON_FAIL) || 20,
+    // Timeout de 2 minutos por job (120 segundos)
+    jobsOpts: {
+      removeOnComplete: parseInt(process.env.QUEUE_REMOVE_ON_COMPLETE) || 50,
+      removeOnFail: parseInt(process.env.QUEUE_REMOVE_ON_FAIL) || 20,
+      delay: 0,
+      attempts: 3,
+      backoff: {
+        type: 'exponential',
+        delay: 5000
+      }
+    }
   });
 
   // Listeners para eventos do worker

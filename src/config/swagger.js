@@ -73,11 +73,10 @@ Se você não fornecer um webhookUrl, pode:
 2. **Fazer download**: \`GET /api/jobs/{jobId}/download\`
 3. **Regenerar se expirado**: \`POST /api/jobs/{jobId}/regenerate\`
 
-## ⏰ Expiração de PDFs
+## ⏰ Armazenamento de PDFs
 
-- **Prazo**: PDFs expiram após tempo configurável (padrão: 86400 segundos)
-- **Limpeza automática**: Arquivos são removidos automaticamente após expiração
-- **Regeneração**: PDFs expirados podem ser regenerados com os dados originais
+- **Prazo**: PDFs ficam disponíveis por tempo configurável (padrão: 86400 segundos)
+- **Regeneração**: PDFs podem ser regenerados com os dados originais se necessário
 
 ## 🔐 Autenticação
 

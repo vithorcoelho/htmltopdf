@@ -57,10 +57,6 @@ class PdfStorageService {
     return await this.driver.deletePdf(jobId);
   }
 
-  async cleanExpiredPdfs() {
-    return await this.driver.cleanExpiredPdfs();
-  }
-
   getStats() {
     return this.driver.getStats();
   }
