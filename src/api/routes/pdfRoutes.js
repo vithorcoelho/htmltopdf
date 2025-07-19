@@ -1,7 +1,14 @@
 const express = require('express');
 const authenticate = require('../middlewares/auth');
 const { generatePdf } = require('../controllers/pdfController');
-const { getJobStatus, downloadPdf, regeneratePdf, getStorageStats } = require('../controllers/jobController');
+const { 
+  getJobStatus, 
+  downloadPdf, 
+  regeneratePdf, 
+  getStorageStats,
+  getPresignedUrl,
+  getDriverInfo
+} = require('../controllers/jobController');
 
 const router = express.Router();
 
@@ -340,5 +347,131 @@ router.post('/jobs/:jobId/regenerate', authenticate, regeneratePdf);
  *                   example: './pdfs'
  */
 router.get('/storage/stats', authenticate, getStorageStats);
+
+/**
+ * @swagger
+ * /api/storage/driver:
+ *   get:
+ *     tags:
+ *       - Storage
+ *     summary: Informações do driver de armazenamento
+ *     description: |
+ *       Retorna informações sobre o driver de armazenamento atual e suas capacidades.
+ *       
+ *       **Drivers disponíveis**:
+ *       - `local`: Armazenamento no sistema de arquivos local
+ *       - `s3`: Armazenamento no Amazon S3 (suporta URLs pré-assinadas)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Informações do driver
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 type:
+ *                   type: string
+ *                   description: Tipo do driver atual
+ *                   example: 's3'
+ *                 supportsPresignedUrls:
+ *                   type: boolean
+ *                   description: Se o driver suporta URLs pré-assinadas
+ *                   example: true
+ *                 availableDrivers:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                   description: Lista de drivers disponíveis
+ *                   example: ['local', 's3']
+ *                 configuration:
+ *                   type: object
+ *                   description: Configurações específicas do driver
+ */
+router.get('/storage/driver', authenticate, getDriverInfo);
+
+/**
+ * @swagger
+ * /api/jobs/{jobId}/presigned-url:
+ *   get:
+ *     tags:
+ *       - Job Management
+ *     summary: Obter URL pré-assinada para download (S3 apenas)
+ *     description: |
+ *       Gera uma URL pré-assinada para download direto do S3, sem passar pelo servidor.
+ *       
+ *       **Disponível apenas para o driver S3**.
+ *       
+ *       **Vantagens**:
+ *       - Download direto do S3 (mais rápido)
+ *       - Reduz carga no servidor
+ *       - URL temporária e segura
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: jobId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID do job
+ *         example: 'a3fafc13-e776-4fcb-a100-c474ea6422a4'
+ *       - in: query
+ *         name: expiresIn
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 3600
+ *           minimum: 60
+ *           maximum: 604800
+ *         description: Tempo de expiração da URL em segundos (1 hora a 7 dias)
+ *         example: 3600
+ *     responses:
+ *       200:
+ *         description: URL pré-assinada gerada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 jobId:
+ *                   type: string
+ *                   example: 'a3fafc13-e776-4fcb-a100-c474ea6422a4'
+ *                 presignedUrl:
+ *                   type: string
+ *                   description: URL para download direto
+ *                   example: 'https://s3.amazonaws.com/bucket/file.pdf?signature=...'
+ *                 expiresIn:
+ *                   type: integer
+ *                   description: Tempo de expiração em segundos
+ *                   example: 3600
+ *                 expiresAt:
+ *                   type: string
+ *                   format: date-time
+ *                   description: Data/hora de expiração da URL
+ *                   example: '2025-07-19T11:30:00Z'
+ *                 message:
+ *                   type: string
+ *                   example: 'URL pré-assinada gerada com sucesso'
+ *       400:
+ *         description: Driver não suporta URLs pré-assinadas ou parâmetros inválidos
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: 'URLs pré-assinadas não suportadas'
+ *                 message:
+ *                   type: string
+ *                   example: 'O driver atual (local) não suporta URLs pré-assinadas. Use o driver S3.'
+ *       404:
+ *         description: Job não encontrado
+ *       410:
+ *         description: PDF expirado
+ */
+router.get('/jobs/:jobId/presigned-url', authenticate, getPresignedUrl);
 
 module.exports = router;

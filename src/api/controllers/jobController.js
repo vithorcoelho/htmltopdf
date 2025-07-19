@@ -147,13 +147,91 @@ async function regeneratePdf(req, res) {
 async function getStorageStats(req, res) {
   try {
     const stats = pdfStorageService.getStats();
+    const driverInfo = pdfStorageService.getDriverInfo();
+    
     res.json({
       ...stats,
       expirationSeconds: process.env.PDF_EXPIRATION_SECONDS || 86400,
-      storageDir: process.env.PDF_STORAGE_DIR || './pdfs'
+      storageDir: process.env.PDF_STORAGE_DIR || './pdfs',
+      driver: driverInfo
     });
   } catch (error) {
     console.error('Erro ao obter estatísticas:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+}
+
+async function getPresignedUrl(req, res) {
+  try {
+    const { jobId } = req.params;
+    const expiresIn = parseInt(req.query.expiresIn) || 3600; // 1 hora por padrão
+    
+    if (!jobId) {
+      return res.status(400).json({ error: 'JobId é obrigatório' });
+    }
+
+    // Verificar se o driver suporta URLs pré-assinadas
+    const driverInfo = pdfStorageService.getDriverInfo();
+    if (!driverInfo.supportsPresignedUrls) {
+      return res.status(400).json({ 
+        error: 'URLs pré-assinadas não suportadas',
+        message: `O driver atual (${driverInfo.type}) não suporta URLs pré-assinadas. Use o driver S3.`
+      });
+    }
+
+    try {
+      const presignedUrl = await pdfStorageService.getPresignedUrl(jobId, expiresIn);
+      
+      res.json({
+        jobId,
+        presignedUrl,
+        expiresIn,
+        expiresAt: new Date(Date.now() + expiresIn * 1000),
+        message: 'URL pré-assinada gerada com sucesso'
+      });
+    } catch (error) {
+      if (error.message.includes('não encontrado')) {
+        return res.status(404).json({ 
+          error: 'Job não encontrado',
+          message: error.message
+        });
+      }
+      
+      if (error.message.includes('expirado')) {
+        return res.status(410).json({ 
+          error: 'PDF expirado',
+          message: error.message
+        });
+      }
+      
+      throw error;
+    }
+  } catch (error) {
+    console.error('Erro ao gerar URL pré-assinada:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+}
+
+async function getDriverInfo(req, res) {
+  try {
+    const driverInfo = pdfStorageService.getDriverInfo();
+    
+    res.json({
+      ...driverInfo,
+      configuration: {
+        expirationSeconds: process.env.PDF_EXPIRATION_SECONDS || 86400,
+        ...(driverInfo.type === 'local' && {
+          storageDir: process.env.PDF_STORAGE_DIR || './pdfs'
+        }),
+        ...(driverInfo.type === 's3' && {
+          bucket: process.env.AWS_S3_BUCKET || 'htmltopdf-storage',
+          region: process.env.AWS_REGION || 'us-east-1',
+          prefix: process.env.AWS_S3_PREFIX || 'pdfs/'
+        })
+      }
+    });
+  } catch (error) {
+    console.error('Erro ao obter informações do driver:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 }
@@ -162,5 +240,7 @@ module.exports = {
   getJobStatus, 
   downloadPdf, 
   regeneratePdf, 
-  getStorageStats 
+  getStorageStats,
+  getPresignedUrl,
+  getDriverInfo
 };
