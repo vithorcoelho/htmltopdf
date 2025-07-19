@@ -40,19 +40,16 @@ RUN apt-get update && apt-get install -y \
     xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Instalar Yarn
-RUN corepack enable && corepack prepare yarn@stable --activate
-
 WORKDIR /app
 
-COPY package.json yarn.lock* ./
-RUN yarn install --frozen-lockfile --production
+COPY package.json package-lock.json* ./
+RUN npm ci --only=production
 
 # Instalar browsers do Playwright
-RUN yarn playwright install chromium
+RUN npx playwright install chromium
 
 COPY . .
 
 EXPOSE 3000
 
-CMD ["yarn", "start"]
+CMD ["npm", "start"]

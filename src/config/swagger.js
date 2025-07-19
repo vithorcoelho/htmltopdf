@@ -87,10 +87,8 @@ Todas as requisições requerem um token Bearer no header:
     },
     servers: [
       {
-        url: process.env.NODE_ENV === 'production' 
-          ? 'https://your-domain.com' 
-          : `http://localhost:${process.env.PORT || 3000}`,
-        description: process.env.NODE_ENV === 'production' ? 'Produção' : 'Desenvolvimento'
+        url: '/',
+        description: 'API Server'
       }
     ],
     components: {

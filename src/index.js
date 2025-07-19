@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const cors = require('cors');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
 // const bullBoardAdapter = require('./config/bullBoard'); // Descomentar na Fase 5
@@ -10,13 +11,38 @@ require('./queue/pdfWorker'); // Iniciar worker
 
 const app = express();
 
+// CORS - permitir todas as origens para desenvolvimento
+app.use(cors({
+  origin: true,
+  credentials: true,
+  optionsSuccessStatus: 200
+}));
+
 app.use(express.json());
 
 // Rotas
 app.use('/api', pdfRoutes);
 
-// Swagger
-app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+// Swagger com configuração customizada
+const swaggerOptions = {
+  explorer: true,
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'HTML to PDF API',
+  swaggerOptions: {
+    persistAuthorization: true,
+    tryItOutEnabled: true,
+    filter: true,
+    defaultModelsExpandDepth: -1,
+    docExpansion: 'none'
+  }
+};
+
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, swaggerOptions));
+
+// Rota para acessar a especificação JSON do Swagger
+app.get('/swagger.json', (req, res) => {
+  res.json(swaggerSpec);
+});
 
 // Bull Board - Descomentar na Fase 5
 // app.use('/admin/queues', bullBoardAdapter.getRouter());

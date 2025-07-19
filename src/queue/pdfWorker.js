@@ -3,6 +3,17 @@ const pdfGenerator = require('../services/pdfGenerator');
 const webhookService = require('../services/webhookService');
 const pdfStorageService = require('../services/pdfStorageService');
 
+// Parse Redis URL if provided
+let connectionConfig;
+if (process.env.REDIS_URL) {
+  connectionConfig = process.env.REDIS_URL;
+} else {
+  connectionConfig = {
+    host: process.env.REDIS_HOST || 'localhost',
+    port: process.env.REDIS_PORT || 6380
+  };
+}
+
 const worker = new Worker('pdf-generation', async (job) => {
   const { html, url, pageSize, orientation, webhookUrl } = job.data;
   
@@ -68,10 +79,7 @@ const worker = new Worker('pdf-generation', async (job) => {
     throw error;
   }
 }, {
-  connection: {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: process.env.REDIS_PORT || 6379
-  },
+  connection: connectionConfig,
   concurrency: 5
 });
 

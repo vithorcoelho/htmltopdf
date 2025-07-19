@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - REDIS_HOST=redis
+      - REDIS_PORT=6380
+      - API_TOKEN=${API_TOKEN:-dev_token_123}
+      - WEBHOOK_TOKEN=${WEBHOOK_TOKEN:-dev_webhook_token_456}
+      - BROWSER_POOL_MIN=2
+      - BROWSER_POOL_MAX=5
+      - BROWSER_MAX_USES=50
+      - JOB_TIMEOUT=30000
+      - PDF_STORAGE_DIR=./pdfs
+      - PDF_EXPIRATION_HOURS=24
+    depends_on:
+      - redis
+    volumes:
+      - ./pdfs:/app/pdfs
+    networks:
+      - pdf-network
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --port 6380 --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6380:6380"
+    networks:
+      - pdf-network
+
+networks:
+  pdf-network:
+    driver: bridge
