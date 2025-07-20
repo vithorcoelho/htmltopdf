@@ -5,15 +5,21 @@ const factory = {
   create: async () => {
     try {
       const browser = await chromium.launch({
-        headless: false, // Modo visual para debug
+        headless: true,
         args: [
           '--no-sandbox', 
           '--disable-setuid-sandbox',
           '--disable-web-security',
           '--disable-features=VizDisplayCompositor',
-          '--start-maximized', // Iniciar maximizado para melhor visualização
-          '--disable-web-security', // Permitir acesso a recursos externos
-          '--disable-features=VizDisplayCompositor'
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--disable-software-rasterizer',
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-renderer-backgrounding',
+          '--no-first-run',
+          '--no-default-browser-check',
+          '--single-process'
         ]
       });
       browser.useCount = 0;

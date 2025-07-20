@@ -1,9 +1,8 @@
 const { Worker } = require('bullmq');
-const pdfGenerator = require('../services/pdfGenerator');
 const webhookService = require('../services/webhookService');
-const pdfStorageService = require('../services/pdfStorageService');
+const pdfUrlGenerator = require('../services/pdfUrlGenerator');
 
-console.log('🔄 Inicializando worker PDF...');
+console.log('🔄 Inicializando worker PDF simplificado...');
 
 // Validação das variáveis de ambiente
 if (!process.env.REDIS_HOST && !process.env.REDIS_URL) {
@@ -35,98 +34,106 @@ let worker;
 try {
   console.log('🚀 Criando worker PDF...');
   
-  worker = new Worker('pdf-generation', async (job) => {
-    console.log(`🎯 Processando job ${job.id}`);
-    const { html, url, pageSize, orientation, webhookUrl } = job.data;
+  worker = new Worker('pdf-url-generation', async (job) => {
+    console.log(`🎯 Processando job URL-to-PDF ${job.id}`);
+    const { url, webhook, pageSize = 'A4', orientation = 'portrait' } = job.data;
+    
+    if (!url || !webhook) {
+      throw new Error('URL e webhook são obrigatórios');
+    }
     
     try {
-      // Marcar job como em processamento
-      pdfStorageService.setJobProcessing(job.id);
-      
-      // Gerar PDF
-      console.log(`📄 Gerando PDF para job ${job.id}...`);
-      const pdfBuffer = await pdfGenerator.generate({
-        html,
+      // Gerar PDF a partir da URL
+      console.log(`📄 Gerando PDF de URL para job ${job.id}...`);
+      const pdfBuffer = await pdfUrlGenerator.generateFromUrl({
         url,
         pageSize,
         orientation
       });
-      
-      // Salvar PDF no storage
-      await pdfStorageService.savePdf(job.id, pdfBuffer, {
-        pageSize,
-        orientation,
-        sourceType: html ? 'html' : 'url',
-        sourceLength: html ? html.length : undefined,
-        sourceUrl: url,
-        hasWebhook: !!webhookUrl
+
+      console.log(`✅ PDF gerado - Tamanho: ${Math.round(pdfBuffer.length / 1024)}KB`);
+
+      // Verificar tamanho limite (10MB)
+      const maxSizeBytes = 10 * 1024 * 1024;
+      if (pdfBuffer.length > maxSizeBytes) {
+        console.warn(`⚠️ PDF muito grande: ${Math.round(pdfBuffer.length / 1024 / 1024)}MB`);
+        
+        // Enviar webhook de erro por tamanho
+        await webhookService.sendNotification({
+          webhookUrl: webhook,
+          data: {
+            jobId: job.id,
+            status: 'Arquivo muito grande',
+            error: `PDF gerado é muito grande (${Math.round(pdfBuffer.length / 1024 / 1024)}MB). Limite: 10MB`,
+            url: url
+          }
+        });
+        
+        return { success: false, error: 'PDF muito grande', size: pdfBuffer.length };
+      }
+
+      // Enviar PDF via webhook
+      console.log(`📤 Enviando PDF via webhook para job ${job.id}...`);
+      await webhookService.sendPdf({
+        webhookUrl: webhook,
+        pdfBuffer,
+        jobId: job.id,
+        metadata: {
+          url,
+          pageSize,
+          orientation,
+          generatedAt: new Date().toISOString()
+        }
       });
       
-      // Enviar webhook apenas se fornecido
-      if (webhookUrl) {
-        try {
-          await webhookService.send({
-            webhookUrl,
-            jobId: job.id,
-            status: 'completed',
-            pdfBuffer
-          });
-          console.log(`✅ Webhook enviado para job ${job.id}`);
-        } catch (webhookError) {
-          console.error(`❌ Erro ao enviar webhook para job ${job.id}:`, webhookError.message);
-          // Não falhar o job por erro de webhook
-        }
-      } else {
-        console.log(`✅ PDF gerado para job ${job.id} - webhook não configurado`);
-      }
+      console.log(`🎉 Job ${job.id} processado e enviado com sucesso`);
+      return { 
+        success: true, 
+        size: pdfBuffer.length,
+        url: url,
+        webhookSent: true 
+      };
       
-      console.log(`🎉 Job ${job.id} processado com sucesso`);
-      return { success: true, size: pdfBuffer.length, webhookSent: !!webhookUrl };
     } catch (error) {
       console.error(`❌ Erro ao processar job ${job.id}:`, error.message);
-      console.error('Stack trace:', error.stack);
       
-      // Marcar job como falha
-      pdfStorageService.setJobFailed(job.id, error);
-      
-      // Enviar webhook de erro apenas se fornecido
-      if (webhookUrl) {
-        try {
-          console.log(`🔔 Enviando webhook de erro para job ${job.id}...`);
-          await webhookService.send({
-            webhookUrl,
+      // Enviar webhook de erro
+      try {
+        await webhookService.sendNotification({
+          webhookUrl: webhook,
+          data: {
             jobId: job.id,
-            status: 'failed',
-            error: error.message
-          });
-          console.log(`✅ Webhook de erro enviado para job ${job.id}`);
-        } catch (webhookError) {
-          console.error(`❌ Erro ao enviar webhook de falha para job ${job.id}:`, webhookError.message);
-          console.error('Stack trace:', webhookError.stack);
-        }
+            status: 'Falha ao gerar',
+            error: error.message,
+            url: url
+          }
+        });
+        console.log(`📡 Webhook de erro enviado para job ${job.id}`);
+      } catch (webhookError) {
+        console.error(`❌ Erro ao enviar webhook de falha para job ${job.id}:`, webhookError.message);
       }
       
       throw error;
     }
   }, {
     connection: connectionConfig,
-    concurrency: 5,
+    concurrency: 3, // Reduzido
     settings: {
-      retryProcessDelay: 5000,
+      retryProcessDelay: 2000,
       maxStalledCount: 1,
       stalledInterval: 30000
     },
-    removeOnComplete: parseInt(process.env.QUEUE_REMOVE_ON_COMPLETE) || 50,
-    removeOnFail: parseInt(process.env.QUEUE_REMOVE_ON_FAIL) || 20,
-    // Timeout de 2 minutos por job (120 segundos)
+    removeOnComplete: parseInt(process.env.QUEUE_REMOVE_ON_COMPLETE) || 10,
+    removeOnFail: parseInt(process.env.QUEUE_REMOVE_ON_FAIL) || 5,
+    // Timeout de 3 minutos por job
     jobsOpts: {
-      removeOnComplete: parseInt(process.env.QUEUE_REMOVE_ON_COMPLETE) || 50,
-      removeOnFail: parseInt(process.env.QUEUE_REMOVE_ON_FAIL) || 20,
+      removeOnComplete: parseInt(process.env.QUEUE_REMOVE_ON_COMPLETE) || 10,
+      removeOnFail: parseInt(process.env.QUEUE_REMOVE_ON_FAIL) || 5,
       delay: 0,
-      attempts: 3,
+      attempts: 2, // Reduzido
       backoff: {
         type: 'exponential',
-        delay: 5000
+        delay: 2000
       }
     }
   });
@@ -157,7 +164,8 @@ try {
     console.log('🔄 Worker tentando reconectar ao Redis...');
   });
 
-  console.log('✅ Worker PDF configurado com sucesso');
+  console.log('✅ Worker PDF simplificado configurado com sucesso');
+  console.log('📋 Funcionalidades: processamento de URL-to-PDF com webhook');
 
 } catch (error) {
   console.error('❌ Erro ao criar worker PDF:', error.message);

@@ -1,5 +1,4 @@
-const pdfGenerator = require('../../services/pdfGenerator');
-const pdfStorageService = require('../../services/pdfStorageService');
+const pdfHtmlGenerator = require('../../services/pdfHtmlGenerator');
 const { v4: uuidv4 } = require('uuid');
 
 async function generatePdfSync(req, res) {
@@ -30,7 +29,7 @@ async function generatePdfSync(req, res) {
     }
 
     // Gerar PDF diretamente (síncrono)
-    const pdfBuffer = await pdfGenerator.generate({
+    const pdfBuffer = await pdfHtmlGenerator.generateFromHtml({
       html,
       pageSize,
       orientation
@@ -50,25 +49,15 @@ async function generatePdfSync(req, res) {
       return res.send(pdfBuffer);
     }
 
-    // Salvar o PDF no storage para resposta JSON
-    const fileInfo = await pdfStorageService.savePdf(fileId, pdfBuffer, {
-      htmlSize,
-      pageSize,
-      orientation,
-      sync: true,
-      type: 'sync-pdf',
-      timestamp: new Date().toISOString()
-    });
-
-    // Retornar resposta com link de download
+    // Retornar resposta JSON com o PDF em base64 (para compatibilidade)
     res.json({
       success: true,
       fileId,
       fileName,
-      downloadUrl: fileInfo.downloadUrl,
       size: pdfBuffer.length,
       htmlSize,
-      message: 'PDF gerado com sucesso'
+      message: 'PDF gerado com sucesso',
+      pdfBase64: pdfBuffer.toString('base64') // PDF diretamente na resposta
     });
 
   } catch (error) {

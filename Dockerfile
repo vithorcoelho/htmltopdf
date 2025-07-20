@@ -38,6 +38,7 @@ RUN apt-get update && apt-get install -y \
     libxtst6 \
     lsb-release \
     xdg-utils \
+    xvfb \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -52,4 +53,5 @@ COPY . .
 
 EXPOSE 3000
 
-CMD ["npm", "start"]
+# Usar xvfb-run para criar um display virtual para o Playwright
+CMD ["sh", "-c", "xvfb-run -a -s '-screen 0 1280x720x24' npm start"]

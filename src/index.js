@@ -5,7 +5,6 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
 const pdfRoutes = require('./api/routes/pdfRoutes');
 const { warmUp } = require('./services/browserPool');
-const pdfStorageService = require('./services/pdfStorageService');
 require('./queue/pdfWorker'); // Iniciar worker
 
 const app = express();

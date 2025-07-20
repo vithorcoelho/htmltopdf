@@ -1,12 +1,13 @@
-const { browserPool } = require('../../services/browserPool');
+const pdfQueue = require('../../queue/pdfQueue');
 const axios = require('axios');
+const { v4: uuidv4 } = require('uuid');
 
 /**
- * Gera PDF a partir de URL com validação de webhook
- * Não armazena arquivo, envia diretamente por webhook
+ * Gera PDF a partir de URL com validação síncrona de webhook
+ * Usa fila para processamento assíncrono - sem armazenamento de arquivos
  */
 async function generatePdfFromUrl(req, res) {
-  const { url, webhook } = req.body;
+  const { url, webhook, pageSize = 'A4', orientation = 'portrait' } = req.body;
 
   // Validação básica
   if (!url || !webhook) {
@@ -30,15 +31,15 @@ async function generatePdfFromUrl(req, res) {
     });
   }
 
-  console.log(`🚀 Iniciando validação para URL: ${url}`);
-  console.log(`📡 Webhook: ${webhook}`);
+  console.log(`Iniciando validação para URL: ${url}`);
+  console.log(`Webhook: ${webhook}`);
 
   // VALIDAÇÃO SÍNCRONA DO WEBHOOK (timeout de 2 segundos)
   try {
-    console.log('📋 Validando webhook de forma síncrona...');
+    console.log('Validando webhook de forma síncrona...');
     
     const webhookValidationResponse = await axios.post(webhook, {
-      status: 'Geração do PDF iniciada'
+      status: 'processing'
     }, {
       timeout: 2000, // 2 segundos
       headers: {
@@ -55,10 +56,10 @@ async function generatePdfFromUrl(req, res) {
       });
     }
 
-    console.log('✅ Webhook validado com sucesso');
+    console.log('Webhook validado com sucesso');
 
   } catch (webhookError) {
-    console.error('❌ Falha na validação do webhook:', webhookError.message);
+    console.error('Falha na validação do webhook:', webhookError.message);
     
     // Determinar tipo de erro para resposta mais específica
     let errorMessage = 'Webhook não respondeu';
@@ -84,189 +85,45 @@ async function generatePdfFromUrl(req, res) {
     });
   }
 
-  // Webhook validado com sucesso - aceitar requisição
-  res.status(202).json({
-    message: 'Webhook validado - PDF será gerado',
-    url: url,
-    webhook: webhook,
-    status: 'Processamento iniciado'
-  });
-
-  // Processar PDF de forma assíncrona (webhook já foi validado)
-  processUrlToPdfWithWebhook(url, webhook);
-}
-
-async function processUrlToPdfWithWebhook(url, webhook) {
-  let browser = null;
-  let page = null;
-
+  // Webhook validado - criar job na fila
   try {
-    // Webhook já foi validado na função anterior
-    console.log('🔄 Iniciando geração do PDF...');
+    const jobId = uuidv4();
     
-    // Obter browser do pool
-    browser = await browserPool.acquire();
-    page = await browser.newPage();
-
-    // Configurar página
-    await page.setViewportSize({ width: 1200, height: 800 });
-    
-    // Tentar carregar a página com estratégias de fallback
-    await loadPageWithFallback(page, url);
-
-    // Aguardar conteúdo dinâmico
-    console.log('⏳ Aguardando conteúdo dinâmico...');
-    await page.waitForTimeout(3000);
-
-    // Gerar PDF
-    console.log('📄 Gerando PDF...');
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: {
-        top: '1cm',
-        right: '1cm',
-        bottom: '1cm',
-        left: '1cm'
+    await pdfQueue.add('generate-pdf-from-url', {
+      url,
+      webhook,
+      pageSize,
+      orientation
+    }, {
+      jobId,
+      delay: 0,
+      attempts: 2,
+      backoff: {
+        type: 'exponential',
+        delay: 2000
       }
     });
 
-    console.log(`✅ PDF gerado com sucesso - Tamanho: ${Math.round(pdfBuffer.length / 1024)}KB`);
+    console.log(`📝 Job ${jobId} criado na fila`);
 
-    // Verificar se o arquivo não é muito grande (limite: 10MB)
-    const maxSizeBytes = 10 * 1024 * 1024; // 10MB
-    if (pdfBuffer.length > maxSizeBytes) {
-      console.warn(`⚠️ PDF muito grande: ${Math.round(pdfBuffer.length / 1024 / 1024)}MB`);
-      
-      await notifyWebhook(webhook, {
-        status: 'Arquivo muito grande',
-        error: `PDF gerado é muito grande (${Math.round(pdfBuffer.length / 1024 / 1024)}MB). Limite: 10MB`,
-        url: url
-      });
-      return;
-    }
-
-    // Enviar PDF via webhook
-    console.log('📤 Enviando PDF via webhook...');
-    
-    await sendPdfToWebhook(webhook, pdfBuffer, url);
-    
-    console.log('🎉 Processo concluído com sucesso!');
-
-  } catch (error) {
-    console.error('❌ Erro durante geração do PDF:', error.message);
-    
-    // Notificar falha via webhook
-    await notifyWebhook(webhook, {
-      status: 'Falha ao gerar',
-      error: error.message,
-      url: url
-    });
-    
-  } finally {
-    // Limpeza
-    if (page) {
-      try {
-        await page.close();
-      } catch (e) {
-        console.error('Erro ao fechar página:', e.message);
-      }
-    }
-    
-    if (browser) {
-      try {
-        await browserPool.release(browser);
-      } catch (e) {
-        console.error('Erro ao retornar browser ao pool:', e.message);
-      }
-    }
-  }
-}
-
-async function loadPageWithFallback(page, url) {
-  const strategies = [
-    { name: 'networkidle', waitUntil: 'networkidle', timeout: 30000 },
-    { name: 'domcontentloaded', waitUntil: 'domcontentloaded', timeout: 45000 },
-    { name: 'load', waitUntil: 'load', timeout: 60000 }
-  ];
-
-  for (const strategy of strategies) {
-    try {
-      console.log(`🔄 Tentativa com ${strategy.name}...`);
-      await page.goto(url, {
-        waitUntil: strategy.waitUntil,
-        timeout: strategy.timeout
-      });
-      console.log(`✅ Sucesso com ${strategy.name}`);
-      return;
-    } catch (error) {
-      console.log(`❌ Falha com ${strategy.name}: ${error.message}`);
-      if (strategy === strategies[strategies.length - 1]) {
-        throw new Error(`Não foi possível carregar a página: ${error.message}`);
-      }
-    }
-  }
-}
-
-async function sendPdfToWebhook(webhook, pdfBuffer, originalUrl) {
-  try {
-    const FormData = require('form-data');
-    const form = new FormData();
-    
-    // Adicionar arquivo PDF
-    form.append('file', pdfBuffer, {
-      filename: `pdf-${Date.now()}.pdf`,
-      contentType: 'application/pdf'
-    });
-    
-    // Adicionar dados do status
-    form.append('status', 'Gerado com sucesso');
-    form.append('url', originalUrl);
-    form.append('fileSize', pdfBuffer.length.toString());
-    form.append('generatedAt', new Date().toISOString());
-
-    const response = await axios.post(webhook, form, {
-      headers: {
-        ...form.getHeaders(),
-        'User-Agent': 'HTMLtoPDF-Service/1.0'
-      },
-      timeout: 30000, // 30 segundos para upload
-      maxContentLength: 50 * 1024 * 1024, // 50MB max
-      maxBodyLength: 50 * 1024 * 1024
+    res.status(202).json({
+      message: 'Webhook validado - PDF será gerado',
+      jobId: jobId,
+      url: url,
+      webhook: webhook,
+      status: 'queued',
+      pageSize,
+      orientation
     });
 
-    if (response.status === 200 || response.status === 201) {
-      console.log('✅ PDF enviado com sucesso via webhook');
-    } else {
-      throw new Error(`Webhook retornou status ${response.status}`);
-    }
-
-  } catch (error) {
-    console.error('❌ Erro ao enviar PDF via webhook:', error.message);
+  } catch (queueError) {
+    console.error('Erro ao criar job na fila:', queueError.message);
     
-    // Tentar notificar sobre a falha no envio
-    await notifyWebhook(webhook, {
-      status: 'Falha ao enviar arquivo',
-      error: `Erro no envio do PDF: ${error.message}`,
-      url: originalUrl
+    return res.status(500).json({
+      error: 'Erro interno do servidor',
+      details: 'Falha ao criar job de processamento',
+      suggestion: 'Tente novamente em alguns instantes'
     });
-    
-    throw error;
-  }
-}
-
-async function notifyWebhook(webhook, data) {
-  try {
-    await axios.post(webhook, data, {
-      timeout: 10000,
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'HTMLtoPDF-Service/1.0'
-      }
-    });
-    console.log('📡 Notificação enviada para webhook');
-  } catch (error) {
-    console.error('❌ Erro ao notificar webhook:', error.message);
   }
 }
 

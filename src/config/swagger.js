@@ -182,10 +182,6 @@ Todas as requisições requerem um token Bearer no header:
       {
         name: 'Job Management', 
         description: 'Endpoints para consulta e gerenciamento de jobs'
-      },
-      {
-        name: 'Storage',
-        description: 'Endpoints para informações do armazenamento'
       }
     ]
   },
